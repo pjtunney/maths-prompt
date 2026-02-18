@@ -7,6 +7,7 @@ import subprocess
 from maths_prompt.config import (
     CLAUDE_MODEL,
     EVAL_LOG_PATH,
+    MAX_TURNS,
     MCP_CONFIG_PATH,
     OPTIMIZER_SYSTEM_PROMPT,
     SANDBOX_SETTINGS_PATH,
@@ -35,7 +36,7 @@ def load_best_from_logs() -> tuple[str | None, float]:
     return best_prompt, best_score
 
 
-def build_task(best_prompt: str | None, best_score: float) -> str:
+def build_task(best_prompt: str | None, best_score: float, previous_summary: str | None = None) -> str:
     """Build the task prompt for the Claude Code instance."""
     if best_prompt:
         best_context = (
@@ -46,18 +47,27 @@ def build_task(best_prompt: str | None, best_score: float) -> str:
     else:
         best_context = ""
 
+    if previous_summary:
+        summary_context = (
+            f"\n\nSummary from the previous session (what was tried and learned):\n"
+            f"---\n{previous_summary}\n---\n"
+        )
+    else:
+        summary_context = ""
+
     return (
         "Optimise the system prompt for the math model. "
         "Use evaluate_prompt() to test prompts and iterate. "
         "Try at least 8-10 different prompt variations. "
         "Focus on maximising accuracy."
         f"{best_context}"
+        f"{summary_context}"
     )
 
 
-def run_optimizer(best_prompt: str | None, best_score: float) -> subprocess.CompletedProcess:
+def run_optimizer(best_prompt: str | None, best_score: float, previous_summary: str | None = None) -> subprocess.CompletedProcess:
     """Launch a sandboxed Claude Code instance to optimize prompts."""
-    task = build_task(best_prompt, best_score)
+    task = build_task(best_prompt, best_score, previous_summary)
 
     # Strip CLAUDECODE env var to prevent nested detection
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
@@ -74,6 +84,7 @@ def run_optimizer(best_prompt: str | None, best_score: float) -> subprocess.Comp
             "claude",
             "--print",
             "--tools", "",
+            "--max-turns", str(MAX_TURNS),
             "--mcp-config", str(MCP_CONFIG_PATH),
             "--strict-mcp-config",
             "--settings", str(SANDBOX_SETTINGS_PATH),

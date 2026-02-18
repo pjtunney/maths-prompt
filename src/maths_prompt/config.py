@@ -22,6 +22,7 @@ SESSION_TIMEOUT_SECONDS = 7200
 
 # Claude
 CLAUDE_MODEL = "sonnet"
+MAX_TURNS = 25
 
 OPTIMIZER_SYSTEM_PROMPT = """\
 You are a prompt engineer optimising a system prompt for a small base language
