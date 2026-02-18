@@ -79,20 +79,22 @@ def run_optimizer(best_prompt: str | None, best_score: float, previous_summary: 
             f"---\n{best_prompt}\n---\n"
         )
 
+    cmd = [
+        "claude",
+        "--print",
+        "--tools", "",
+        "--max-turns", str(MAX_TURNS),
+        "--mcp-config", str(MCP_CONFIG_PATH),
+        "--strict-mcp-config",
+        "--settings", str(SANDBOX_SETTINGS_PATH),
+        "--dangerously-skip-permissions",
+        "--model", CLAUDE_MODEL,
+        "--system-prompt", system_prompt,
+        "-p", task,
+    ]
+
     return subprocess.run(
-        [
-            "claude",
-            "--print",
-            "--tools", "",
-            "--max-turns", str(MAX_TURNS),
-            "--mcp-config", str(MCP_CONFIG_PATH),
-            "--strict-mcp-config",
-            "--settings", str(SANDBOX_SETTINGS_PATH),
-            "--dangerously-skip-permissions",
-            "--model", CLAUDE_MODEL,
-            "--system-prompt", system_prompt,
-            "-p", task,
-        ],
+        cmd,
         env=env,
         capture_output=True,
         text=True,

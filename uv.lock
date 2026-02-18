@@ -611,6 +611,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "rich" },
     { name = "streamlit" },
+    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -626,6 +627,7 @@ requires-dist = [
     { name = "pydantic" },
     { name = "rich" },
     { name = "streamlit" },
+    { name = "typer" },
 ]
 
 [package.metadata.requires-dev]

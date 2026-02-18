@@ -10,10 +10,11 @@ dependencies = [
     "pydantic",
     "streamlit",
     "plotly",
+    "typer",
 ]
 
 [project.scripts]
-maths-prompt = "maths_prompt.main:main"
+maths-prompt = "maths_prompt.main:app"
 
 [build-system]
 requires = ["hatchling"]

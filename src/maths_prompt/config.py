@@ -7,6 +7,8 @@ MCP_CONFIG_PATH = PROJECT_ROOT / "mcp.json"
 SANDBOX_SETTINGS_PATH = PROJECT_ROOT / "sandbox_settings.json"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
+PID_FILE_PATH = LOGS_DIR / "optimizer.pid"
+OPTIMIZER_LOG_PATH = LOGS_DIR / "optimizer.log"
 
 # MLX model (pre-quantized to 4-bit for speed)
 MLX_MODEL_PATH = PROJECT_ROOT / "models/Qwen2.5-0.5B-4bit"
