@@ -3,24 +3,21 @@
 import json
 from datetime import datetime, timezone
 
-from maths_prompt.config import TEST_LOG_PATH, TEST_PROBLEMS_PATH
+from maths_prompt.config import TEST_LOG_PATH, TEST_PROBLEM_COUNT
+from maths_prompt.generator import generate_test_problems
 from maths_prompt.model import query_model
 from maths_prompt.scorer import check_answer, extract_number
-
-
-def load_test_problems() -> list[dict]:
-    """Load test problems from data/test_problems.json."""
-    with open(TEST_PROBLEMS_PATH) as f:
-        return json.load(f)
 
 
 def run_test_eval(prompt: str) -> float:
     """Evaluate prompt against the held-out test set.
 
+    Generates TEST_PROBLEM_COUNT problems deterministically (fixed seed).
     Logs full details to logs/test_results.jsonl.
     Returns accuracy as a float.
     """
-    problems = load_test_problems()
+    raw_problems = generate_test_problems(n=TEST_PROBLEM_COUNT)
+    problems = [{"question": p.question, "answer": p.answer, "category": p.category} for p in raw_problems]
     correct = 0
     details = []
 

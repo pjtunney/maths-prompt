@@ -19,7 +19,7 @@ _session = 1
 
 @mcp.tool()
 def evaluate_prompt(prompt: str) -> str:
-    """Test a system prompt against 80 randomly-generated math problems.
+    """Test a system prompt against 400 randomly-generated math problems.
 
     Returns only the accuracy score. Problems are freshly randomised each call.
     """

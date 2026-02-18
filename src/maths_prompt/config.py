@@ -2,11 +2,9 @@ from pathlib import Path
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
 LOGS_DIR = PROJECT_ROOT / "logs"
 MCP_CONFIG_PATH = PROJECT_ROOT / "mcp.json"
 SANDBOX_SETTINGS_PATH = PROJECT_ROOT / "sandbox_settings.json"
-TEST_PROBLEMS_PATH = DATA_DIR / "test_problems.json"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
 
@@ -15,8 +13,8 @@ OLLAMA_MODEL = "qwen2.5:0.5b"
 OLLAMA_HOST = "http://localhost:11434"
 
 # Problem generation
-TRAIN_PROBLEM_COUNT = 80
-TEST_PROBLEM_COUNT = 40
+TRAIN_PROBLEM_COUNT = 400
+TEST_PROBLEM_COUNT = 1000
 
 # Runner
 MAX_RETRIES = 50
@@ -36,9 +34,11 @@ maths by default. Your job is to find a system prompt that makes it as accurate
 as possible at solving math problems.
 
 You have exactly ONE tool: evaluate_prompt(prompt)
-- It tests your prompt against 80 randomly-generated math problems
+- It tests your prompt against 400 randomly-generated math problems
 - It returns ONLY the accuracy percentage
 - Problems are freshly randomised each call — you cannot overfit
+- Statistical note: with 400 problems, the standard error is ~±2.5 percentage points
+  (95% CI ≈ ±5pp), so differences smaller than ~3pp are likely noise
 
 Strategy:
 - Start with a simple prompt to establish a baseline score
@@ -46,5 +46,6 @@ Strategy:
 - Consider approaches: few-shot examples, chain-of-thought, step-by-step formatting, explicit instructions
 - Each iteration, make deliberate changes and observe the effect on accuracy
 - Keep track of what worked and what didn't
+- Only treat improvements larger than ~5pp as meaningful signal
 - Aim to maximise accuracy — even small improvements matter
 """
