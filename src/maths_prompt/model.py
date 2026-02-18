@@ -16,11 +16,12 @@ def _load():
 def _format_prompt(tokenizer, system_prompt: str, question: str) -> str:
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": question},
+        {"role": "user", "content": question + " ="},
     ]
     return tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True
     )
+
 
 
 def query_model(system_prompt: str, question: str) -> str:
