@@ -1,38 +1,48 @@
+import math
 import re
-
-from maths_prompt.config import FLOAT_TOLERANCE
 
 
 def extract_number(text: str) -> float | None:
-    """Extract the last number from model output using regex.
+    """Extract the first number from model output.
 
-    Handles integers, decimals, negatives, and simple fractions like 1/4.
-    Returns the last match (most likely to be the final answer).
+    Strips whitespace, then returns the first match of an integer,
+    decimal, negative, or simple fraction (e.g. 1/4).
     """
-    # Match numbers: optional negative, digits, optional decimal, optional fraction
+    text = text.strip()
     matches = re.findall(r"-?\d+(?:\.\d+)?(?:/\d+)?", text)
     if not matches:
         return None
 
-    last = matches[-1]
-    if "/" in last:
-        parts = last.split("/")
+    first = matches[0]
+    if "/" in first:
+        parts = first.split("/")
         try:
             return float(parts[0]) / float(parts[1])
         except (ValueError, ZeroDivisionError):
             return None
     try:
-        return float(last)
+        return float(first)
     except ValueError:
         return None
 
 
-def check_answer(
-    extracted: float | None,
-    expected: float,
-    tolerance: float = FLOAT_TOLERANCE,
-) -> bool:
-    """Check if extracted answer matches expected within tolerance."""
+def _round_sig(x: float, sig: int) -> float:
+    """Round x to `sig` significant figures."""
+    if x == 0:
+        return 0.0
+    d = math.floor(math.log10(abs(x)))
+    factor = 10 ** (sig - 1 - d)
+    return round(x * factor) / factor
+
+
+def check_answer(extracted: float | None, expected: float) -> bool:
+    """Check if extracted matches expected.
+
+    Integers (expected has no fractional part) must match exactly.
+    Floats are compared to 3 significant figures.
+    """
     if extracted is None:
         return False
-    return abs(extracted - expected) <= tolerance
+    if expected == int(expected):
+        return extracted == expected
+    return _round_sig(extracted, 3) == _round_sig(expected, 3)
