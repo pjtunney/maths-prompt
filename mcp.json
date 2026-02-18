@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "maths-eval": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "maths_prompt.mcp_server"],
+      "cwd": "/Users/pjtunney/repos/maths-prompt"
+    }
+  }
+}

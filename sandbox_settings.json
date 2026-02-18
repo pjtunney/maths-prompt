@@ -1,0 +1,10 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": ["localhost", "127.0.0.1"]
+    }
+  }
+}
