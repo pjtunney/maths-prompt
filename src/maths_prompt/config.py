@@ -3,10 +3,9 @@ from pathlib import Path
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = PROJECT_ROOT / "logs"
-MCP_CONFIG_PATH = PROJECT_ROOT / "mcp.json"
-SANDBOX_SETTINGS_PATH = PROJECT_ROOT / "sandbox_settings.json"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
+SESSION_LOG_PATH = LOGS_DIR / "sessions.jsonl"
 PID_FILE_PATH = LOGS_DIR / "optimizer.pid"
 OPTIMIZER_LOG_PATH = LOGS_DIR / "optimizer.log"
 
@@ -22,9 +21,10 @@ MAX_RETRIES = 50
 RETRY_DELAY_SECONDS = 300
 SESSION_TIMEOUT_SECONDS = 7200
 
-# Claude
-CLAUDE_MODEL = "sonnet"
-MAX_TURNS = 25
+# Anthropic API
+API_MODEL = "claude-sonnet-4-6"
+MAX_TOOL_CALLS = 25
+MAX_TOKENS_PER_TURN = 4096
 
 OPTIMIZER_SYSTEM_PROMPT = """\
 You are a prompt engineer optimising a system prompt for a small base language

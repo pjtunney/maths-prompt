@@ -5,7 +5,7 @@ description = "Iterative prompt engineering to teach a base LLM maths"
 requires-python = ">=3.11"
 dependencies = [
     "mlx-lm",
-    "mcp[cli]",
+    "anthropic",
     "rich",
     "pydantic",
     "streamlit",

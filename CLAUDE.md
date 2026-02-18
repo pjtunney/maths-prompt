@@ -30,25 +30,30 @@ Requires the MLX model to be converted once before first use:
 uv run python -m mlx_lm.convert --hf-path Qwen/Qwen2.5-0.5B --mlx-path models/Qwen2.5-0.5B-4bit -q
 ```
 
+Requires a valid Anthropic API key:
+```bash
+export MATHS_PROMPT_API_KEY=sk-ant-...
+```
+
 ## Architecture
 
-This project has two distinct runtime roles that must not be conflated:
+This project has two distinct runtime roles:
 
 **1. The runner (`main.py` → `runner.py`)**
-Runs as a background daemon (via `maths-prompt start`). Spawns a sandboxed Claude Code subprocess in a loop, retrying on failure (5-minute backoff, up to 50 retries, 2-hour session timeout). After each session completes, times out, or fails, it independently evaluates the best-known prompt against the held-out test set (`test_eval.py`). Passes the best prompt, score, and previous session summary forward as context to the next session (session compaction).
+Runs as a background daemon (via `maths-prompt start`). Calls the Anthropic API directly using the `anthropic` Python SDK, providing `evaluate_prompt` as a tool. Retries on failure (5-minute backoff, up to 50 retries). After each session completes or fails, it independently evaluates the best-known prompt against the held-out test set (`test_eval.py`). Passes the best prompt, score, and previous session summary forward as context to the next session (session compaction).
 
-**2. The sandboxed Claude Code instance**
-Launched by `runner.py` with `--tools ""` (no built-in tools) and `--strict-mcp-config` so the only available tool is `evaluate_prompt` from our MCP server. It has no file system access, no bash, no web access. Its sole job is to call `evaluate_prompt` in a loop and converge on a good prompt. The `CLAUDECODE` env var is stripped before spawning to prevent nested-instance detection issues.
+**2. The Anthropic API conversation**
+The runner sends messages to the Anthropic API with a single tool definition (`evaluate_prompt`). Claude calls this tool in a loop, receiving only the accuracy percentage back. The conversation continues until Claude stops calling tools or the max tool call limit (25) is reached. After the main loop, a final API call asks Claude to summarise what was tried and learned.
 
-**3. The MCP server (`mcp_server.py`)**
-Bridges the two roles. Receives prompt strings from the sandboxed Claude, runs them against 400 freshly randomised training problems via mlx-lm (batch inference), scores purely in Python (no LLM calls for scoring), logs everything to `logs/evaluations.jsonl`, and returns only `"Accuracy: X% (n/400 correct)"` — Claude sees nothing else.
+**3. The evaluator (`evaluator.py`)**
+Called locally by the runner when Claude invokes the `evaluate_prompt` tool. Generates 400 freshly randomised training problems, runs them against mlx-lm (batch inference), scores purely in Python (no LLM calls for scoring), logs everything to `logs/evaluations.jsonl`, and returns only `"Accuracy: X% (n/400 correct)"`.
 
 ## Key design invariants
 
 - **Scoring is zero-LLM**: `scorer.py` uses regex + float comparison only. Never add LLM calls to the scoring path.
 - **Training problems are always freshly randomised**: `generator.py` is called fresh each `evaluate_prompt` invocation. Do not cache or reuse problems within a session.
 - **Test set uses a fixed seed**: `generator.py`'s `generate_test_problems()` produces 1000 problems deterministically (seed 42) across 7 categories (exponents, modulo, long chains, deeply nested, negatives, decimals, large numbers). These problem types do not appear in training. Claude never evaluates on them — only the outer runner does via `test_eval.py`.
-- **Information asymmetry is intentional**: The sandboxed Claude only ever sees the accuracy percentage. Full details (model responses, per-problem results) are logged but never surfaced to Claude.
+- **Information asymmetry is intentional**: The optimizer Claude only ever sees the accuracy percentage. Full details (model responses, per-problem results) are logged but never surfaced to Claude.
 
 ## Configuration
 

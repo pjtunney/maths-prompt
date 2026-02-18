@@ -1,27 +1,20 @@
-"""MCP server exposing evaluate_prompt tool to sandboxed Claude."""
+"""Evaluate a prompt against randomly-generated math problems."""
 
 import json
-import time
 from datetime import datetime, timezone
-
-from mcp.server.fastmcp import FastMCP
 
 from maths_prompt.config import EVAL_LOG_PATH, TRAIN_PROBLEM_COUNT
 from maths_prompt.generator import generate_problems
 from maths_prompt.model import query_model_batch
 from maths_prompt.scorer import check_answer, extract_number
 
-mcp = FastMCP("maths-eval")
-
 _iteration = 0
-_session = 1
 
 
-@mcp.tool()
-def evaluate_prompt(prompt: str) -> str:
-    """Test a system prompt against 400 randomly-generated math problems.
+def evaluate_prompt(prompt: str, session: int) -> str:
+    """Test a system prompt against freshly-randomised math problems.
 
-    Returns only the accuracy score. Problems are freshly randomised each call.
+    Returns only the accuracy score string.
     """
     global _iteration
     _iteration += 1
@@ -49,11 +42,10 @@ def evaluate_prompt(prompt: str) -> str:
 
     accuracy = correct / len(problems)
 
-    # Log everything
     log_entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "iteration": _iteration,
-        "session": _session,
+        "session": session,
         "prompt": prompt,
         "num_problems": len(problems),
         "num_correct": correct,
@@ -65,11 +57,3 @@ def evaluate_prompt(prompt: str) -> str:
         f.write(json.dumps(log_entry) + "\n")
 
     return f"Accuracy: {accuracy:.1%} ({correct}/{len(problems)} correct)"
-
-
-def main():
-    mcp.run()
-
-
-if __name__ == "__main__":
-    main()

@@ -6,19 +6,21 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from maths_prompt.config import (
-    CLAUDE_MODEL,
+    API_MODEL,
     EVAL_LOG_PATH,
     MAX_RETRIES,
     MLX_MODEL_PATH,
     OPTIMIZER_LOG_PATH,
     PID_FILE_PATH,
     RETRY_DELAY_SECONDS,
+    SESSION_LOG_PATH,
     TRAIN_PROBLEM_COUNT,
 )
 
@@ -40,7 +42,7 @@ def _print_config():
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="green")
     table.add_row("MLX model", str(MLX_MODEL_PATH))
-    table.add_row("Claude model", CLAUDE_MODEL)
+    table.add_row("API model", API_MODEL)
     table.add_row("Training problems per eval", str(TRAIN_PROBLEM_COUNT))
     table.add_row("Retry delay", f"{RETRY_DELAY_SECONDS}s")
     table.add_row("Max retries", str(MAX_RETRIES))
@@ -60,6 +62,34 @@ def _is_running() -> int | None:
         return None
 
 
+def _log_session(session: int, result, test_acc: float | None = None) -> None:
+    """Append a session summary line to sessions.jsonl."""
+    # Rough cost estimate for claude-sonnet-4-6 ($/1M tokens):
+    #   Input: $3, Output: $15, Cache creation: $3.75, Cache read: $0.30
+    cost = (
+        result.input_tokens * 3.0
+        + result.output_tokens * 15.0
+        + result.cache_creation_tokens * 3.75
+        + result.cache_read_tokens * 0.30
+    ) / 1_000_000
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session": session,
+        "success": result.success,
+        "tool_calls_made": result.tool_calls_made,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "cache_creation_tokens": result.cache_creation_tokens,
+        "cache_read_tokens": result.cache_read_tokens,
+        "estimated_cost_usd": round(cost, 4),
+        "test_accuracy": test_acc,
+    }
+    SESSION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(SESSION_LOG_PATH, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
 def _run_loop():
     """The actual optimization loop (runs in the background process)."""
     from maths_prompt.runner import load_best_from_logs, run_optimizer
@@ -74,9 +104,9 @@ def _run_loop():
         print(f"\n--- Session {session} | Best so far: {best_score:.1%} ---", flush=True)
 
         try:
-            result = run_optimizer(best_prompt, best_score, previous_summary)
-        except subprocess.TimeoutExpired:
-            print("Session timed out", flush=True)
+            result = run_optimizer(best_prompt, best_score, previous_summary, session=session)
+        except Exception as e:
+            print(f"Session failed: {e}", flush=True)
             best_prompt, best_score = load_best_from_logs()
             if best_prompt:
                 print("Running test eval on best prompt so far...", flush=True)
@@ -86,23 +116,30 @@ def _run_loop():
             time.sleep(RETRY_DELAY_SECONDS)
             continue
 
-        if result.returncode == 0:
-            print("Session completed successfully", flush=True)
-            if result.stdout:
-                print(result.stdout[:2000], flush=True)
-            previous_summary = result.stdout.strip() or None
-        else:
-            print(f"Claude exited with code {result.returncode}", flush=True)
-            if result.stderr:
-                print(result.stderr[:500], flush=True)
-            print(f"Retrying in {RETRY_DELAY_SECONDS}s...", flush=True)
-            time.sleep(RETRY_DELAY_SECONDS)
+        if result.fatal_error:
+            # Billing/auth errors — no point retrying
+            print(f"Stopping optimization loop due to fatal error.", flush=True)
+            _log_session(session, result)
+            break
 
+        test_acc = None
         best_prompt, best_score = load_best_from_logs()
         if best_prompt:
             print("Running test set evaluation...", flush=True)
             test_acc = run_test_eval(best_prompt)
             print(f"Training best: {best_score:.1%} | Test accuracy: {test_acc:.1%}", flush=True)
+
+        _log_session(session, result, test_acc)
+
+        if result.success:
+            print(f"Session completed ({result.tool_calls_made} tool calls)", flush=True)
+            if result.summary:
+                print(result.summary[:2000], flush=True)
+            previous_summary = result.summary
+        else:
+            print("Session did not complete successfully", flush=True)
+            print(f"Retrying in {RETRY_DELAY_SECONDS}s...", flush=True)
+            time.sleep(RETRY_DELAY_SECONDS)
 
     print("\nDone!", flush=True)
 
@@ -111,6 +148,11 @@ def _run_loop():
 def start():
     """Start the optimization loop as a background daemon."""
     _verify_mlx()
+
+    if "MATHS_PROMPT_API_KEY" not in os.environ:
+        console.print("[red]MATHS_PROMPT_API_KEY environment variable not set[/]")
+        console.print("[yellow]Export your Anthropic API key: export MATHS_PROMPT_API_KEY=sk-ant-...[/]")
+        raise SystemExit(1)
 
     existing = _is_running()
     if existing:

@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import streamlit as st
 
-from maths_prompt.config import EVAL_LOG_PATH, TEST_LOG_PATH
+from maths_prompt.config import EVAL_LOG_PATH, SESSION_LOG_PATH, TEST_LOG_PATH
 
 st.set_page_config(page_title="maths-prompt dashboard", layout="wide")
 st.title("maths-prompt optimisation dashboard")
@@ -20,9 +20,10 @@ def load_jsonl(path):
 
 train_logs = load_jsonl(EVAL_LOG_PATH)
 test_logs = load_jsonl(TEST_LOG_PATH)
+session_logs = load_jsonl(SESSION_LOG_PATH)
 
 if not train_logs:
-    st.info("No evaluation logs yet. Run `uv run maths-prompt` to start.")
+    st.info("No evaluation logs yet. Run `uv run maths-prompt start` to begin.")
     st.stop()
 
 train_df = pd.DataFrame(
@@ -87,6 +88,40 @@ if "problems" in best_log:
     st.dataframe(summary.style.format({"accuracy": "{:.1%}"}))
 
 st.divider()
+
+# API usage & cost
+if session_logs:
+    st.subheader("API usage per session")
+    sess_df = pd.DataFrame(session_logs)
+
+    total_cost = sess_df["estimated_cost_usd"].sum()
+    total_tool_calls = sess_df["tool_calls_made"].sum()
+    total_input = sess_df["input_tokens"].sum()
+    total_cache_read = sess_df["cache_read_tokens"].sum()
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Estimated total cost", f"${total_cost:.3f}")
+    c2.metric("Total tool calls", int(total_tool_calls))
+    c3.metric("Total input tokens", f"{total_input:,}")
+    c4.metric("Cache read tokens", f"{total_cache_read:,}")
+
+    # Cost per session chart
+    if len(sess_df) > 1:
+        st.line_chart(sess_df.set_index("session")["estimated_cost_usd"])
+
+    # Sessions table
+    display_cols = ["session", "tool_calls_made", "input_tokens", "output_tokens",
+                    "cache_creation_tokens", "cache_read_tokens", "estimated_cost_usd",
+                    "test_accuracy", "success"]
+    available = [c for c in display_cols if c in sess_df.columns]
+    fmt = {}
+    if "estimated_cost_usd" in available:
+        fmt["estimated_cost_usd"] = "${:.4f}"
+    if "test_accuracy" in available:
+        fmt["test_accuracy"] = lambda x: f"{x:.1%}" if x is not None else "—"
+    st.dataframe(sess_df[available].style.format(fmt), use_container_width=True)
+
+    st.divider()
 
 # Full history table
 st.subheader("Evaluation history")
