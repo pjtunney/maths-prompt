@@ -6,8 +6,6 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
 SESSION_LOG_PATH = LOGS_DIR / "sessions.jsonl"
-PID_FILE_PATH = LOGS_DIR / "optimizer.pid"
-OPTIMIZER_LOG_PATH = LOGS_DIR / "optimizer.log"
 
 # MLX model (pre-quantized to 4-bit for speed)
 MLX_MODEL_PATH = PROJECT_ROOT / "models/Qwen2.5-0.5B-4bit"
