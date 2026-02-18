@@ -8,6 +8,8 @@ dependencies = [
     "mcp[cli]",
     "rich",
     "pydantic",
+    "streamlit",
+    "plotly",
 ]
 
 [project.scripts]
@@ -23,7 +25,4 @@ packages = ["src/maths_prompt"]
 [dependency-groups]
 dev = [
     "pytest",
-    "jupyter",
-    "matplotlib",
-    "pandas",
 ]
