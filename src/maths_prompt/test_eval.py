@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from maths_prompt.config import TEST_LOG_PATH, TEST_PROBLEM_COUNT
 from maths_prompt.generator import generate_test_problems
-from maths_prompt.model import query_model
+from maths_prompt.model import query_model_batch
 from maths_prompt.scorer import check_answer, extract_number
 
 
@@ -21,8 +21,8 @@ def run_test_eval(prompt: str) -> float:
     correct = 0
     details = []
 
-    for p in problems:
-        response = query_model(prompt, p["question"])
+    responses = query_model_batch(prompt, [p["question"] for p in problems])
+    for p, response in zip(problems, responses):
         extracted = extract_number(response)
         is_correct = check_answer(extracted, p["answer"])
         if is_correct:

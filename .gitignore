@@ -17,3 +17,4 @@ logs/*.jsonl
 !logs/.gitkeep
 .DS_Store
 .claude/
+models/

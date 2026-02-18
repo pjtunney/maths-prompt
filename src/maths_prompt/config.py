@@ -8,9 +8,8 @@ SANDBOX_SETTINGS_PATH = PROJECT_ROOT / "sandbox_settings.json"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
 
-# Ollama
-OLLAMA_MODEL = "qwen2.5:0.5b"
-OLLAMA_HOST = "http://localhost:11434"
+# MLX model (pre-quantized to 4-bit for speed)
+MLX_MODEL_PATH = PROJECT_ROOT / "models/Qwen2.5-0.5B-4bit"
 
 # Problem generation
 TRAIN_PROBLEM_COUNT = 400

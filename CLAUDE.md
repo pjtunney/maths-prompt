@@ -14,12 +14,16 @@ uv run jupyter notebook notebooks/analysis.ipynb  # Open progress dashboard
 uv run python -c "from maths_prompt.generator import generate_problems; [print(p) for p in generate_problems(5)]"
 uv run python -c "from maths_prompt.scorer import extract_number; print(extract_number('The answer is 42.'))"
 uv run python -c "from maths_prompt.model import query_model; print(query_model('Solve this.', '2 + 2'))"
+uv run python -c "from maths_prompt.model import query_model_batch; print(query_model_batch('Solve this.', ['2 + 2', '3 * 4']))"
 
 # Inspect logs
 python -c "import json; [print(f\"{json.loads(l)['iteration']}: {json.loads(l)['accuracy']:.1%}\") for l in open('logs/evaluations.jsonl')]"
 ```
 
-Requires Ollama running locally: `ollama pull qwen2.5:0.5b`
+Requires the MLX model to be converted once before first use:
+```bash
+uv run python -m mlx_lm.convert --hf-path Qwen/Qwen2.5-0.5B --mlx-path models/Qwen2.5-0.5B-4bit -q
+```
 
 ## Architecture
 
@@ -32,7 +36,7 @@ Runs in the outer shell. Spawns a sandboxed Claude Code subprocess in a loop, re
 Launched by `runner.py` with `--tools ""` (no built-in tools) and `--strict-mcp-config` so the only available tool is `evaluate_prompt` from our MCP server. It has no file system access, no bash, no web access. Its sole job is to call `evaluate_prompt` in a loop and converge on a good prompt. The `CLAUDECODE` env var is stripped before spawning to prevent nested-instance detection issues.
 
 **3. The MCP server (`mcp_server.py`)**
-Bridges the two roles. Receives prompt strings from the sandboxed Claude, runs them against 80 freshly randomised training problems via Ollama, scores purely in Python (no LLM calls for scoring), logs everything to `logs/evaluations.jsonl`, and returns only `"Accuracy: X% (n/80 correct)"` — Claude sees nothing else.
+Bridges the two roles. Receives prompt strings from the sandboxed Claude, runs them against 400 freshly randomised training problems via mlx-lm (batch inference), scores purely in Python (no LLM calls for scoring), logs everything to `logs/evaluations.jsonl`, and returns only `"Accuracy: X% (n/400 correct)"` — Claude sees nothing else.
 
 ## Key design invariants
 
