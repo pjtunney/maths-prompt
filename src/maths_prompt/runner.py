@@ -203,12 +203,15 @@ def run_optimizer(
                         )
 
                 # Cache only the most recent tool result (prefix caching).
-                # Remove cache_control from the previous tool-result message so we
-                # never exceed the API's limit of 4 cache_control blocks per request.
-                if messages and messages[-1]["role"] == "user":
-                    for item in messages[-1]["content"]:
-                        if isinstance(item, dict):
-                            item.pop("cache_control", None)
+                # messages[-1] is the assistant turn just appended above, so the
+                # previous user tool-result is at messages[-2]. Strip its
+                # cache_control so we never exceed the API's limit of 4 blocks.
+                if len(messages) >= 2 and messages[-2]["role"] == "user":
+                    prev = messages[-2]["content"]
+                    if isinstance(prev, list):
+                        for item in prev:
+                            if isinstance(item, dict):
+                                item.pop("cache_control", None)
                 if tool_results:
                     tool_results[-1]["cache_control"] = {"type": "ephemeral"}
                 messages.append({"role": "user", "content": tool_results})
