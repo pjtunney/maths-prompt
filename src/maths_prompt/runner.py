@@ -126,26 +126,12 @@ def run_optimizer(
             f"---\n{best_prompt}\n---\n"
         )
 
-    # Cache the system prompt — it's constant for the whole session
-    system_with_cache = [
-        {
-            "type": "text",
-            "text": system_prompt,
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
+    system_with_cache = [{"type": "text", "text": system_prompt}]
 
-    # Cache the initial user message — it's constant for the whole session
     messages: list = [
         {
             "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": task,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
+            "content": [{"type": "text", "text": task}],
         }
     ]
 
@@ -216,6 +202,15 @@ def run_optimizer(
                             }
                         )
 
+                # Cache only the most recent tool result (prefix caching).
+                # Remove cache_control from the previous tool-result message so we
+                # never exceed the API's limit of 4 cache_control blocks per request.
+                if messages and messages[-1]["role"] == "user":
+                    for item in messages[-1]["content"]:
+                        if isinstance(item, dict):
+                            item.pop("cache_control", None)
+                if tool_results:
+                    tool_results[-1]["cache_control"] = {"type": "ephemeral"}
                 messages.append({"role": "user", "content": tool_results})
 
                 if tool_call_count >= MAX_TOOL_CALLS:
