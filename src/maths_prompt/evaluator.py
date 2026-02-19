@@ -8,7 +8,24 @@ from maths_prompt.generator import generate_problems
 from maths_prompt.model import query_model_batch
 from maths_prompt.scorer import check_answer, extract_number
 
-_iteration = 0
+def _load_last_iteration() -> int:
+    if not EVAL_LOG_PATH.exists():
+        return 0
+    last = 0
+    with open(EVAL_LOG_PATH) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("iteration", 0) > last:
+                    last = entry["iteration"]
+            except json.JSONDecodeError:
+                pass
+    return last
+
+_iteration = _load_last_iteration()
 
 
 def evaluate_prompt(prompt: str, session: int) -> str:
