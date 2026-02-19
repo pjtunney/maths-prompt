@@ -202,14 +202,12 @@ def run_optimizer(
                             }
                         )
 
-                # Cache only the most recent tool result (prefix caching).
-                # messages[-1] is the assistant turn just appended above, so the
-                # previous user tool-result is at messages[-2]. Strip its
-                # cache_control so we never exceed the API's limit of 4 blocks.
-                if len(messages) >= 2 and messages[-2]["role"] == "user":
-                    prev = messages[-2]["content"]
-                    if isinstance(prev, list):
-                        for item in prev:
+                # Cache only the most recent message. First strip any existing
+                # cache_control from all prior messages, then add to the new one.
+                for msg in messages:
+                    content = msg.get("content", [])
+                    if isinstance(content, list):
+                        for item in content:
                             if isinstance(item, dict):
                                 item.pop("cache_control", None)
                 if tool_results:
