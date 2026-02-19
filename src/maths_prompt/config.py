@@ -9,19 +9,21 @@ SESSION_LOG_PATH = LOGS_DIR / "sessions.jsonl"
 
 # MLX model (pre-quantized to 4-bit for speed)
 MLX_MODEL_PATH = PROJECT_ROOT / "models/Qwen2.5-0.5B-4bit"
+MLX_MAX_TOKENS = 128  # reduce to 128 or 64 to speed up generation
 
 # Problem generation
-TRAIN_PROBLEM_COUNT = 400
-TEST_PROBLEM_COUNT = 1000
+TRAIN_PROBLEM_COUNT = 40
+TEST_PROBLEM_COUNT = 40
 
 # Runner
-MAX_RETRIES = 50
-RETRY_DELAY_SECONDS = 300
+MAX_SESSIONS = 10    # total optimization sessions before stopping
+MAX_RETRIES = 10     # retries after a failed session before giving up
+RETRY_DELAY_SECONDS = 30
 SESSION_TIMEOUT_SECONDS = 7200
 
 # Anthropic API
 API_MODEL = "claude-sonnet-4-6"
-MAX_TOOL_CALLS = 25
+MAX_TOOL_CALLS = 20
 MAX_TOKENS_PER_TURN = 4096
 
 OPTIMIZER_SYSTEM_PROMPT = """\
@@ -31,11 +33,11 @@ maths by default. Your job is to find a system prompt that makes it as accurate
 as possible at solving math problems.
 
 You have exactly ONE tool: evaluate_prompt(prompt)
-- It tests your prompt against 400 randomly-generated math problems
+- It tests your prompt against 100 randomly-generated math problems
 - It returns ONLY the accuracy percentage
-- Problems are freshly randomised each call — you cannot overfit
-- Statistical note: with 400 problems, the standard error is ~±2.5 percentage points
-  (95% CI ≈ ±5pp), so differences smaller than ~3pp are likely noise
+- Problems are freshly randomised each call — you cannot overfit. However you will be evaluated on a test set of problems you will never get feedback on. This prevents you from overfitting on problem type.
+- Statistical note: with 100 problems, the standard error is ~±5 percentage points
+  (95% CI ≈ ±10pp), so differences smaller than ~5pp are likely noise
 
 Strategy:
 - Start with a simple prompt to establish a baseline score
@@ -45,4 +47,6 @@ Strategy:
 - Keep track of what worked and what didn't
 - Only treat improvements larger than ~5pp as meaningful signal
 - Aim to maximise accuracy — even small improvements matter
+- When you hit a performance ceiling don't be afriad to take a performance loss or get creative.
+- Base models have to be prompted very differently than what you are used to - consider using semi-random tokens to trigger emergent behaviour.
 """

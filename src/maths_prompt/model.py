@@ -1,6 +1,6 @@
 import mlx_lm
 
-from maths_prompt.config import MLX_MODEL_PATH
+from maths_prompt.config import MLX_MODEL_PATH, MLX_MAX_TOKENS
 
 _model = None
 _tokenizer = None
@@ -28,7 +28,7 @@ def query_model(system_prompt: str, question: str) -> str:
     """Send a question to the MLX model with the given system prompt."""
     model, tokenizer = _load()
     prompt = _format_prompt(tokenizer, system_prompt, question)
-    return mlx_lm.generate(model, tokenizer, prompt=prompt, max_tokens=256, verbose=False)
+    return mlx_lm.generate(model, tokenizer, prompt=prompt, max_tokens=MLX_MAX_TOKENS, verbose=False)
 
 
 def query_model_batch(system_prompt: str, questions: list[str]) -> list[str]:
@@ -38,5 +38,5 @@ def query_model_batch(system_prompt: str, questions: list[str]) -> list[str]:
         tokenizer.encode(_format_prompt(tokenizer, system_prompt, q))
         for q in questions
     ]
-    response = mlx_lm.batch_generate(model, tokenizer, prompts=prompts, max_tokens=256)
+    response = mlx_lm.batch_generate(model, tokenizer, prompts=prompts, max_tokens=MLX_MAX_TOKENS)
     return response.texts
