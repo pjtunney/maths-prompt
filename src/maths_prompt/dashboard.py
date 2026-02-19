@@ -1,6 +1,7 @@
 """Streamlit dashboard for monitoring prompt optimisation progress."""
 
 import json
+import time
 
 import pandas as pd
 import streamlit as st
@@ -15,7 +16,14 @@ def load_jsonl(path):
     if not path.exists():
         return []
     with open(path) as f:
-        return [json.loads(line) for line in f if line.strip()]
+        rows = []
+        for line in f:
+            if line.strip():
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass  # skip partial lines mid-write
+        return rows
 
 
 train_logs = load_jsonl(EVAL_LOG_PATH)
@@ -129,3 +137,6 @@ display_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_p
 display_df["accuracy"] = display_df["accuracy"].map("{:.1%}".format)
 display_df["prompt"] = display_df["prompt"].str[:80] + "..."
 st.dataframe(display_df, use_container_width=True)
+
+time.sleep(5)
+st.rerun()
