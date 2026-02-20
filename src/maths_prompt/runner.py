@@ -18,7 +18,7 @@ from maths_prompt.evaluator import evaluate_prompt
 EVALUATE_PROMPT_TOOL = {
     "name": "evaluate_prompt",
     "description": (
-        "Test a system prompt against 400 randomly-generated math problems. "
+        "Test a system prompt against 100 randomly-generated math problems. "
         "Returns only the accuracy score. Problems are freshly randomised each call."
     ),
     "input_schema": {
@@ -37,7 +37,7 @@ EVALUATE_PROMPT_TOOL = {
 @dataclass
 class OptimizerResult:
     success: bool
-    summary: str | None
+    session_context: str | None
     tool_calls_made: int
     input_tokens: int = 0
     output_tokens: int = 0
@@ -67,32 +67,21 @@ def load_best_from_logs() -> tuple[str | None, float]:
     return best_prompt, best_score
 
 
-def build_task(best_prompt: str | None, best_score: float, previous_summary: str | None = None) -> str:
+def build_task(previous_context: str | None = None) -> str:
     """Build the task prompt for the optimizer."""
-    if best_prompt:
-        best_context = (
-            f"\n\nPrevious best result: {best_score:.1%} accuracy with this prompt:\n"
-            f"---\n{best_prompt}\n---\n"
-            f"Try to beat this score. You can start from this prompt or try something completely different."
+    context_block = ""
+    if previous_context:
+        context_block = (
+            f"\n\nContext from the previous session:\n"
+            f"---\n{previous_context}\n---\n"
         )
-    else:
-        best_context = ""
-
-    if previous_summary:
-        summary_context = (
-            f"\n\nSummary from the previous session (what was tried and learned):\n"
-            f"---\n{previous_summary}\n---\n"
-        )
-    else:
-        summary_context = ""
 
     return (
         "Optimise the system prompt for the math model. "
         "Use evaluate_prompt() to test prompts and iterate. "
         "Try at least 8-10 different prompt variations. "
         "Focus on maximising accuracy."
-        f"{best_context}"
-        f"{summary_context}"
+        f"{context_block}"
     )
 
 
@@ -109,24 +98,15 @@ def _is_fatal_api_error(e: anthropic.APIStatusError) -> str | None:
 
 
 def run_optimizer(
-    best_prompt: str | None,
-    best_score: float,
-    previous_summary: str | None = None,
+    previous_context: str | None = None,
     session: int = 1,
 ) -> OptimizerResult:
     """Run the optimizer using direct Anthropic API calls with prompt caching."""
     client = anthropic.Anthropic(api_key=os.environ["MATHS_PROMPT_API_KEY"])
 
-    task = build_task(best_prompt, best_score, previous_summary)
+    task = build_task(previous_context)
 
-    system_prompt = OPTIMIZER_SYSTEM_PROMPT
-    if best_prompt:
-        system_prompt += (
-            f"\n\nPrevious best result: {best_score:.1%} accuracy with this prompt:\n"
-            f"---\n{best_prompt}\n---\n"
-        )
-
-    system_with_cache = [{"type": "text", "text": system_prompt}]
+    system_with_cache = [{"type": "text", "text": OPTIMIZER_SYSTEM_PROMPT}]
 
     messages: list = [
         {
@@ -166,7 +146,7 @@ def run_optimizer(
                     print(f"\n[FATAL] {fatal_msg}", flush=True)
                     return OptimizerResult(
                         success=False,
-                        summary=None,
+                        session_context=None,
                         tool_calls_made=tool_call_count,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
@@ -225,7 +205,7 @@ def run_optimizer(
         print(f"\n[FATAL] {fatal_msg}", flush=True)
         return OptimizerResult(
             success=False,
-            summary=None,
+            session_context=None,
             tool_calls_made=tool_call_count,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -241,31 +221,42 @@ def run_optimizer(
         flush=True,
     )
 
-    # Ask for a session summary
-    summary = None
+    # Ask for session context to pass to the next session
+    session_context = None
     try:
         messages.append(
             {
                 "role": "user",
-                "content": "Summarise what you tried and learned in this session. Be concise — this will be passed to the next session as context.",
+                "content": (
+                    "This session is complete. Please provide context for the next "
+                    "optimisation session. The next session will receive ONLY what you "
+                    "write here — no other information carries over.\n\n"
+                    "Include:\n"
+                    "1. The most promising prompt(s) you found, with their scores\n"
+                    "2. Strategies and approaches that improved accuracy\n"
+                    "3. Strategies that did NOT work (so they aren't repeated)\n"
+                    "4. Observations about the base model's behaviour and failure modes\n"
+                    "5. Recommended next directions\n\n"
+                    "Be thorough — this is the next session's only link to what you discovered."
+                ),
             }
         )
-        summary_response = client.messages.create(
+        context_response = client.messages.create(
             model=API_MODEL,
             max_tokens=MAX_TOKENS_PER_TURN,
             system=system_with_cache,
             tools=[EVALUATE_PROMPT_TOOL],
             messages=messages,
         )
-        _accumulate_usage(summary_response.usage)
-        text_blocks = [b.text for b in summary_response.content if b.type == "text"]
-        summary = "\n".join(text_blocks) if text_blocks else None
+        _accumulate_usage(context_response.usage)
+        text_blocks = [b.text for b in context_response.content if b.type == "text"]
+        session_context = "\n".join(text_blocks) if text_blocks else None
     except Exception as e:
-        print(f"  Warning: failed to get summary: {e}", flush=True)
+        print(f"  Warning: failed to get session context: {e}", flush=True)
 
     return OptimizerResult(
         success=True,
-        summary=summary,
+        session_context=session_context,
         tool_calls_made=tool_call_count,
         input_tokens=input_tokens,
         output_tokens=output_tokens,

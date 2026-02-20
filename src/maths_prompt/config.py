@@ -6,24 +6,23 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
 SESSION_LOG_PATH = LOGS_DIR / "sessions.jsonl"
-SUMMARY_PATH = LOGS_DIR / "last_summary.txt"
 
 # MLX model (pre-quantized to 4-bit for speed)
 MLX_MODEL_PATH = PROJECT_ROOT / "models/Qwen2.5-0.5B-4bit"
 MLX_MAX_TOKENS = 128  # reduce to 128 or 64 to speed up generation
 
 # Problem generation
-TRAIN_PROBLEM_COUNT = 40
-TEST_PROBLEM_COUNT = 40
+TRAIN_PROBLEM_COUNT = 100
+TEST_PROBLEM_COUNT = 100
 
 # Runner
-MAX_SESSIONS = 10    # total optimization sessions before stopping
+MAX_SESSIONS = 5    # total optimization sessions before stopping
 MAX_RETRIES = 10     # retries after a failed session before giving up
 RETRY_DELAY_SECONDS = 30
 SESSION_TIMEOUT_SECONDS = 7200
 
 # Anthropic API
-API_MODEL = "claude-sonnet-4-6"
+API_MODEL = "claude-opus-4-6"
 MAX_TOOL_CALLS = 40
 MAX_TOKENS_PER_TURN = 4096
 
@@ -39,6 +38,11 @@ You have exactly ONE tool: evaluate_prompt(prompt)
 - Problems are freshly randomised each call — you cannot overfit. However you will be evaluated on a test set of problems you will never get feedback on. This prevents you from overfitting on problem type.
 - Statistical note: with 100 problems, the standard error is ~±5 percentage points
   (95% CI ≈ ±10pp), so differences smaller than ~5pp are likely noise
+
+Session structure:
+- You have up to 40 evaluate_prompt() calls in this session
+- There are up to 5 sessions in total; context you write at the end carries over to the next
+- If context from a previous session is shown at the start, build on it rather than repeating explored directions
 
 Strategy:
 - Start with a simple prompt to establish a baseline score

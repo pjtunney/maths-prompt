@@ -15,6 +15,7 @@ env/
 .ipynb_checkpoints/
 logs/*.jsonl
 logs/*.txt
+logs/runs/
 !logs/.gitkeep
 .DS_Store
 .claude/

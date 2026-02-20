@@ -128,6 +128,14 @@ if session_logs:
         fmt["test_accuracy"] = lambda x: f"{x:.1%}" if x is not None else "—"
     st.dataframe(sess_df[available].style.format(fmt), use_container_width=True)
 
+    contexts = [(r["session"], r.get("session_context")) for r in session_logs if r.get("session_context")]
+    if contexts:
+        st.subheader("Session handover notes")
+        for session_num, ctx in contexts:
+            with st.expander(f"Session {session_num}"):
+                st.text(ctx)
+        st.divider()
+
     st.divider()
 
 # Full history table

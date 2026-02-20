@@ -17,7 +17,6 @@ from maths_prompt.config import (
     MLX_MODEL_PATH,
     RETRY_DELAY_SECONDS,
     SESSION_LOG_PATH,
-    SUMMARY_PATH,
     TEST_LOG_PATH,
     TRAIN_PROBLEM_COUNT,
 )
@@ -48,7 +47,7 @@ def _print_config():
     console.print(table)
 
 
-def _log_session(session: int, result, test_acc: float | None = None) -> None:
+def _log_session(session: int, result, test_acc: float | None = None, session_context: str | None = None) -> None:
     """Append a session summary line to sessions.jsonl."""
     # Rough cost estimate for claude-sonnet-4-6 ($/1M tokens):
     #   Input: $3, Output: $15, Cache creation: $3.75, Cache read: $0.30
@@ -70,6 +69,7 @@ def _log_session(session: int, result, test_acc: float | None = None) -> None:
         "cache_read_tokens": result.cache_read_tokens,
         "estimated_cost_usd": round(cost, 4),
         "test_accuracy": test_acc,
+        "session_context": session_context,
     }
     SESSION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(SESSION_LOG_PATH, "a") as f:
@@ -92,9 +92,20 @@ def run():
     from maths_prompt.test_eval import run_test_eval
 
     consecutive_failures = 0
-    previous_summary: str | None = None
-    if SUMMARY_PATH.exists():
-        previous_summary = SUMMARY_PATH.read_text().strip() or None
+    previous_context: str | None = None
+    if SESSION_LOG_PATH.exists():
+        with open(SESSION_LOG_PATH) as f:
+            for line in reversed(f.readlines()):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("session_context"):
+                        previous_context = entry["session_context"]
+                        break
+                except json.JSONDecodeError:
+                    pass
 
     # Resume session numbering from where previous runs left off
     start_session = 1
@@ -118,7 +129,7 @@ def run():
             console.print(f"\n--- Session {session} | Best so far: {best_score:.1%} ---")
 
             try:
-                result = run_optimizer(best_prompt, best_score, previous_summary, session=session)
+                result = run_optimizer(previous_context, session=session)
                 consecutive_failures = 0
             except Exception as e:
                 console.print(f"[red]Session failed: {e}[/]")
@@ -147,15 +158,13 @@ def run():
                 test_acc = run_test_eval(best_prompt)
                 console.print(f"Training best: {best_score:.1%} | Test accuracy: {test_acc:.1%}")
 
-            _log_session(session, result, test_acc)
+            _log_session(session, result, test_acc, session_context=result.session_context)
 
             if result.success:
                 console.print(f"Session completed ({result.tool_calls_made} tool calls)")
-                if result.summary:
-                    console.print(result.summary[:2000])
-                previous_summary = result.summary
-                if result.summary:
-                    SUMMARY_PATH.write_text(result.summary)
+                if result.session_context:
+                    console.print(result.session_context[:2000])
+                previous_context = result.session_context
             else:
                 console.print("Session did not complete successfully")
                 consecutive_failures += 1
@@ -224,7 +233,7 @@ def reset(yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation
     if not yes:
         typer.confirm("Delete all log files and start fresh?", abort=True)
 
-    for path in (EVAL_LOG_PATH, SESSION_LOG_PATH, TEST_LOG_PATH, SUMMARY_PATH):
+    for path in (EVAL_LOG_PATH, SESSION_LOG_PATH, TEST_LOG_PATH):
         if path.exists():
             path.unlink()
 
