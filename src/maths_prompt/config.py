@@ -24,7 +24,8 @@ SESSION_TIMEOUT_SECONDS = 7200
 # Anthropic API
 API_MODEL = "claude-opus-4-6"
 MAX_TOOL_CALLS = 40
-MAX_TOKENS_PER_TURN = 4096
+MAX_TOKENS_PER_TURN = 16384
+MAX_TOKENS_SESSION_CONTEXT = 32768  # higher limit for end-of-session handover notes
 
 OPTIMIZER_SYSTEM_PROMPT = """\
 You are a prompt engineer optimising a system prompt for a small base language

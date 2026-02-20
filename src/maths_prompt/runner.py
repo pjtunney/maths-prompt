@@ -10,6 +10,7 @@ from maths_prompt.config import (
     API_MODEL,
     EVAL_LOG_PATH,
     MAX_TOKENS_PER_TURN,
+    MAX_TOKENS_SESSION_CONTEXT,
     MAX_TOOL_CALLS,
     OPTIMIZER_SYSTEM_PROMPT,
 )
@@ -136,6 +137,8 @@ def run_optimizer(
                 response = client.messages.create(
                     model=API_MODEL,
                     max_tokens=MAX_TOKENS_PER_TURN,
+                    thinking={"type": "adaptive"},
+                    output_config={"effort": "medium"},
                     system=system_with_cache,
                     tools=[EVALUATE_PROMPT_TOOL],
                     messages=messages,
@@ -241,13 +244,16 @@ def run_optimizer(
                 ),
             }
         )
-        context_response = client.messages.create(
+        with client.messages.stream(
             model=API_MODEL,
-            max_tokens=MAX_TOKENS_PER_TURN,
+            max_tokens=MAX_TOKENS_SESSION_CONTEXT,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
             system=system_with_cache,
             tools=[EVALUATE_PROMPT_TOOL],
             messages=messages,
-        )
+        ) as stream:
+            context_response = stream.get_final_message()
         _accumulate_usage(context_response.usage)
         text_blocks = [b.text for b in context_response.content if b.type == "text"]
         session_context = "\n".join(text_blocks) if text_blocks else None
