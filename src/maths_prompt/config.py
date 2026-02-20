@@ -1,4 +1,11 @@
 from pathlib import Path
+from typing import NamedTuple
+
+
+class PromptPair(NamedTuple):
+    """Holds the two strings that frame each math question for the base model."""
+    problem_prefix: str
+    answer_prefix: str
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -28,17 +35,32 @@ MAX_TOKENS_PER_TURN = 16384
 MAX_TOKENS_SESSION_CONTEXT = 32768  # higher limit for end-of-session handover notes
 
 OPTIMIZER_SYSTEM_PROMPT = """\
-You are a prompt engineer optimising a system prompt for a small base language
-model (qwen2.5:0.5b, no RLHF, no instruction tuning). This model cannot do
-maths by default. Your job is to find a system prompt that makes it as accurate
-as possible at solving math problems.
+You are a prompt engineer optimising a **raw text completion model**
+(Qwen2.5-0.5B, a base model — no RLHF, no instruction tuning, no chat training).
+This model does NOT understand chat templates, system prompts, or instruction
+formats. It simply completes the text it is given.
 
-You have exactly ONE tool: evaluate_prompt(prompt)
-- It tests your prompt against 100 randomly-generated math problems
+For each math question, the model receives the concatenation:
+  {problem_prefix}{question}{answer_prefix}
+and then generates a completion. Your job is to find the best problem_prefix and
+answer_prefix strings that make the model produce accurate numeric answers.
+
+You have exactly ONE tool: evaluate_prompt(problem_prefix, answer_prefix)
+- problem_prefix: text placed BEFORE the question. Can be anything from empty to
+  a long multi-line string with instructions, few-shot examples, or formatting.
+- answer_prefix: text placed AFTER the question to elicit the answer. Can range
+  from a short separator to a multi-line chain-of-thought scaffold.
+- Both can be as short or as long as you want — explore the full range
+- It tests your prefix/suffix against 100 randomly-generated math problems
 - It returns ONLY the accuracy percentage
-- Problems are freshly randomised each call — you cannot overfit. However you will be evaluated on a test set of problems you will never get feedback on. This prevents you from overfitting on problem type.
+- Problems are freshly randomised each call — you cannot overfit. However you will
+  be evaluated on a test set of problems you will never get feedback on. This
+  prevents you from overfitting on problem type.
 - Statistical note: with 100 problems, the standard error is ~±5 percentage points
   (95% CI ≈ ±10pp), so differences smaller than ~5pp are likely noise
+- You may re-evaluate the same prefix/suffix to reduce statistical uncertainty —
+  averaging multiple runs shrinks the error. But prefer exploring new variations
+  over re-running unless you need to distinguish two close candidates
 
 Session structure:
 - You have up to 40 evaluate_prompt() calls in this session
@@ -46,13 +68,16 @@ Session structure:
 - If context from a previous session is shown at the start, build on it rather than repeating explored directions
 
 Strategy:
-- Start with a simple prompt to establish a baseline score
-- Think carefully about why a base model fails at maths (formatting? computation? understanding the task?)
-- Consider approaches: few-shot examples, chain-of-thought, step-by-step formatting, explicit instructions
+- Start simple to establish a baseline, then explore broadly
+- Think carefully about what text patterns a base model has seen during pre-training
+  that would make it produce a numeric answer after a math expression
+- Try a wide range of approaches and lengths — short separators, long few-shot
+  prefixes, textbook-style formatting, chain-of-thought scaffolds, calculator
+  notation, or anything else you can think of
 - Each iteration, make deliberate changes and observe the effect on accuracy
 - Keep track of what worked and what didn't
 - Only treat improvements larger than ~5pp as meaningful signal
 - Aim to maximise accuracy — even small improvements matter
-- When you hit a performance ceiling don't be afriad to take a performance loss or get creative.
-- Base models have to be prompted very differently than what you are used to - consider using semi-random tokens to trigger emergent behaviour.
+- When you hit a performance ceiling don't be afraid to take a performance loss or get creative
+- Base models complete text — think about what training data looked like
 """

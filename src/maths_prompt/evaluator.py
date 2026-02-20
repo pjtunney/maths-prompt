@@ -28,8 +28,8 @@ def _load_last_iteration() -> int:
 _iteration = _load_last_iteration()
 
 
-def evaluate_prompt(prompt: str, session: int) -> str:
-    """Test a system prompt against freshly-randomised math problems.
+def evaluate_prompt(problem_prefix: str, answer_prefix: str, session: int) -> str:
+    """Test a prefix/suffix pair against freshly-randomised math problems.
 
     Returns only the accuracy score string.
     """
@@ -40,7 +40,7 @@ def evaluate_prompt(prompt: str, session: int) -> str:
     correct = 0
     details = []
 
-    responses = query_model_batch(prompt, [p.question for p in problems])
+    responses = query_model_batch(problem_prefix, [p.question for p in problems], answer_prefix)
     for p, response in zip(problems, responses):
         extracted = extract_number(response)
         is_correct = check_answer(extracted, p.answer)
@@ -63,7 +63,8 @@ def evaluate_prompt(prompt: str, session: int) -> str:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "iteration": _iteration,
         "session": session,
-        "prompt": prompt,
+        "problem_prefix": problem_prefix,
+        "answer_prefix": answer_prefix,
         "num_problems": len(problems),
         "num_correct": correct,
         "accuracy": accuracy,

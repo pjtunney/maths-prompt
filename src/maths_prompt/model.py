@@ -13,29 +13,22 @@ def _load():
     return _model, _tokenizer
 
 
-def _format_prompt(tokenizer, system_prompt: str, question: str) -> str:
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": question + " ="},
-    ]
-    return tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
+def _format_prompt(problem_prefix: str, question: str, answer_prefix: str) -> str:
+    return f"{problem_prefix}{question}{answer_prefix}"
 
 
-
-def query_model(system_prompt: str, question: str) -> str:
-    """Send a question to the MLX model with the given system prompt."""
+def query_model(problem_prefix: str, question: str, answer_prefix: str) -> str:
+    """Send a question to the MLX model with the given prefix/suffix."""
     model, tokenizer = _load()
-    prompt = _format_prompt(tokenizer, system_prompt, question)
+    prompt = _format_prompt(problem_prefix, question, answer_prefix)
     return mlx_lm.generate(model, tokenizer, prompt=prompt, max_tokens=MLX_MAX_TOKENS, verbose=False)
 
 
-def query_model_batch(system_prompt: str, questions: list[str]) -> list[str]:
+def query_model_batch(problem_prefix: str, questions: list[str], answer_prefix: str) -> list[str]:
     """Send multiple questions to the MLX model in a single batch call."""
     model, tokenizer = _load()
     prompts = [
-        tokenizer.encode(_format_prompt(tokenizer, system_prompt, q))
+        tokenizer.encode(_format_prompt(problem_prefix, q, answer_prefix))
         for q in questions
     ]
     response = mlx_lm.batch_generate(model, tokenizer, prompts=prompts, max_tokens=MLX_MAX_TOKENS)

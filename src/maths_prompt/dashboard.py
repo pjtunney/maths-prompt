@@ -33,6 +33,13 @@ if not train_logs:
     st.info("No evaluation logs yet. Run `uv run maths-prompt start` to begin.")
     st.stop()
 
+# Filter out old-format entries that lack the new fields
+train_logs = [r for r in train_logs if "problem_prefix" in r and "answer_prefix" in r]
+
+if not train_logs:
+    st.info("No evaluation logs in new format. Run `maths-prompt reset --yes` then `uv run maths-prompt run`.")
+    st.stop()
+
 train_df = pd.DataFrame(
     [
         {
@@ -42,7 +49,8 @@ train_df = pd.DataFrame(
             "num_correct": r["num_correct"],
             "num_problems": r["num_problems"],
             "timestamp": r.get("timestamp", ""),
-            "prompt": r["prompt"],
+            "problem_prefix": r["problem_prefix"],
+            "answer_prefix": r["answer_prefix"],
         }
         for r in train_logs
     ]
@@ -78,9 +86,12 @@ if test_logs:
 
 st.divider()
 
-# Best prompt
-st.subheader("Best prompt found")
-st.code(best["prompt"], language=None)
+# Best prompt pair
+st.subheader("Best prompt pair found")
+st.markdown("**problem_prefix:**")
+st.code(best["problem_prefix"], language=None)
+st.markdown("**answer_prefix:**")
+st.code(best["answer_prefix"], language=None)
 
 st.divider()
 
@@ -144,9 +155,10 @@ st.subheader("Evaluation history")
 
 @st.fragment
 def eval_history_table():
-    display_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "prompt"]].copy()
+    display_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "problem_prefix", "answer_prefix"]].copy()
     display_df["accuracy"] = display_df["accuracy"].map("{:.1%}".format)
-    display_df["prompt"] = display_df["prompt"].str[:80] + "..."
+    display_df["problem_prefix"] = display_df["problem_prefix"].str[:40]
+    display_df["answer_prefix"] = display_df["answer_prefix"].str[:40]
     event = st.dataframe(
         display_df,
         use_container_width=True,
@@ -155,17 +167,20 @@ def eval_history_table():
     )
     if event.selection and event.selection.rows:
         selected_row = event.selection.rows[0]
-        full_prompt = train_df.iloc[selected_row]["prompt"]
-        iter_num = int(train_df.iloc[selected_row]["iteration"])
-        acc = train_df.iloc[selected_row]["accuracy"]
+        row = train_df.iloc[selected_row]
+        iter_num = int(row["iteration"])
+        acc = row["accuracy"]
         st.caption(f"Iteration {iter_num} | Accuracy {acc:.1%}")
-        st.code(full_prompt, language=None)
+        st.markdown("**problem_prefix:**")
+        st.code(row["problem_prefix"], language=None)
+        st.markdown("**answer_prefix:**")
+        st.code(row["answer_prefix"], language=None)
 
 
 eval_history_table()
 
-# CSV download with full prompts
-export_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "prompt"]].copy()
+# CSV download with full data
+export_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "problem_prefix", "answer_prefix"]].copy()
 st.download_button("Download full CSV", export_df.to_csv(index=False), "evaluations.csv", "text/csv")
 
 st.button("Refresh", on_click=st.rerun)

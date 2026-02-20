@@ -13,24 +13,31 @@ from maths_prompt.config import (
     MAX_TOKENS_SESSION_CONTEXT,
     MAX_TOOL_CALLS,
     OPTIMIZER_SYSTEM_PROMPT,
+    PromptPair,
 )
 from maths_prompt.evaluator import evaluate_prompt
 
 EVALUATE_PROMPT_TOOL = {
     "name": "evaluate_prompt",
     "description": (
-        "Test a system prompt against 100 randomly-generated math problems. "
-        "Returns only the accuracy score. Problems are freshly randomised each call."
+        "Test a problem_prefix/answer_prefix pair against 100 randomly-generated "
+        "math problems. The model sees: {problem_prefix}{question}{answer_prefix} "
+        "as raw text and completes from there. Returns only the accuracy score. "
+        "Problems are freshly randomised each call."
     ),
     "input_schema": {
         "type": "object",
         "properties": {
-            "prompt": {
+            "problem_prefix": {
                 "type": "string",
-                "description": "The system prompt to test.",
-            }
+                "description": "Text placed before the math question.",
+            },
+            "answer_prefix": {
+                "type": "string",
+                "description": "Text placed after the math question to elicit the answer.",
+            },
         },
-        "required": ["prompt"],
+        "required": ["problem_prefix", "answer_prefix"],
     },
 }
 
@@ -47,12 +54,12 @@ class OptimizerResult:
     fatal_error: str | None = None  # Set for billing/auth errors — stops retry loop
 
 
-def load_best_from_logs() -> tuple[str | None, float]:
-    """Read evaluation logs and return (best_prompt, best_accuracy)."""
+def load_best_from_logs() -> tuple[PromptPair | None, float]:
+    """Read evaluation logs and return (best_prompt_pair, best_accuracy)."""
     if not EVAL_LOG_PATH.exists():
         return None, 0.0
 
-    best_prompt = None
+    best_pair: PromptPair | None = None
     best_score = 0.0
 
     with open(EVAL_LOG_PATH) as f:
@@ -61,11 +68,17 @@ def load_best_from_logs() -> tuple[str | None, float]:
             if not line:
                 continue
             entry = json.loads(line)
+            # Skip old-format entries that lack the new fields
+            if "problem_prefix" not in entry or "answer_prefix" not in entry:
+                continue
             if entry["accuracy"] > best_score:
                 best_score = entry["accuracy"]
-                best_prompt = entry["prompt"]
+                best_pair = PromptPair(
+                    problem_prefix=entry["problem_prefix"],
+                    answer_prefix=entry["answer_prefix"],
+                )
 
-    return best_prompt, best_score
+    return best_pair, best_score
 
 
 def build_task(previous_context: str | None = None) -> str:
@@ -78,9 +91,9 @@ def build_task(previous_context: str | None = None) -> str:
         )
 
     return (
-        "Optimise the system prompt for the math model. "
-        "Use evaluate_prompt() to test prompts and iterate. "
-        "Try at least 8-10 different prompt variations. "
+        "Optimise the problem_prefix and answer_prefix for the math model. "
+        "Use evaluate_prompt(problem_prefix, answer_prefix) to test combinations and iterate. "
+        "Try at least 8-10 different variations. "
         "Focus on maximising accuracy."
         f"{context_block}"
     )
@@ -175,7 +188,11 @@ def run_optimizer(
                     if block.type == "tool_use":
                         tool_call_count += 1
                         print(f"  evaluate_prompt call #{tool_call_count}", flush=True)
-                        result_text = evaluate_prompt(block.input["prompt"], session=session)
+                        result_text = evaluate_prompt(
+                            block.input["problem_prefix"],
+                            block.input["answer_prefix"],
+                            session=session,
+                        )
                         print(f"  -> {result_text}", flush=True)
                         tool_results.append(
                             {
@@ -235,7 +252,7 @@ def run_optimizer(
                     "optimisation session. The next session will receive ONLY what you "
                     "write here — no other information carries over.\n\n"
                     "Include:\n"
-                    "1. The most promising prompt(s) you found, with their scores\n"
+                    "1. The most promising problem_prefix/answer_prefix pairs, with their scores\n"
                     "2. Strategies and approaches that improved accuracy\n"
                     "3. Strategies that did NOT work (so they aren't repeated)\n"
                     "4. Observations about the base model's behaviour and failure modes\n"

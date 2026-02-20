@@ -14,8 +14,8 @@ uv run pytest                    # Run tests
 # Smoke tests
 uv run python -c "from maths_prompt.generator import generate_problems; [print(p) for p in generate_problems(5)]"
 uv run python -c "from maths_prompt.scorer import extract_number; print(extract_number('The answer is 42.'))"
-uv run python -c "from maths_prompt.model import query_model; print(query_model('Solve this.', '2 + 2'))"
-uv run python -c "from maths_prompt.model import query_model_batch; print(query_model_batch('Solve this.', ['2 + 2', '3 * 4']))"
+uv run python -c "from maths_prompt.model import query_model; print(query_model('', '2 + 2', ' = '))"
+uv run python -c "from maths_prompt.model import query_model_batch; print(query_model_batch('', ['2 + 2', '3 * 4'], ' = '))"
 
 # Inspect logs
 python -c "import json; [print(f\"{json.loads(l)['iteration']}: {json.loads(l)['accuracy']:.1%}\") for l in open('logs/evaluations.jsonl')]"
@@ -42,10 +42,10 @@ This project has two distinct runtime roles:
 Runs in the foreground (via `maths-prompt run`, Ctrl+C to stop). Calls the Anthropic API directly using the `anthropic` Python SDK, providing `evaluate_prompt` as a tool. Runs up to `MAX_SESSIONS` sessions total; stops early after `MAX_RETRIES` consecutive failures (30s backoff between retries). After each session completes or fails, it independently evaluates the best-known prompt against the held-out test set (`test_eval.py`). At the end of each session, asks the model to produce context for the next session (promising prompts, what worked/didn't, recommended directions). This model-authored context is the only information that carries over between sessions (`logs/last_context.txt`). On Ctrl+C, runs test eval on the best prompt found so far, then exits cleanly.
 
 **2. The Anthropic API conversation**
-The runner sends messages to the Anthropic API with a single tool definition (`evaluate_prompt`). Claude calls this tool in a loop, receiving only the accuracy percentage back. The conversation continues until Claude stops calling tools or the max tool call limit (25) is reached. After the main loop, a final API call asks Claude to produce context for the next session.
+The runner sends messages to the Anthropic API with a single tool definition (`evaluate_prompt(problem_prefix, answer_prefix)`). Claude calls this tool in a loop, receiving only the accuracy percentage back. Each evaluation concatenates `{problem_prefix}{question}{answer_prefix}` as raw text for the base completion model. The conversation continues until Claude stops calling tools or the max tool call limit is reached. After the main loop, a final API call asks Claude to produce context for the next session.
 
 **3. The evaluator (`evaluator.py`)**
-Called locally by the runner when Claude invokes the `evaluate_prompt` tool. Generates 100 freshly randomised training problems, runs them against mlx-lm (batch inference), scores purely in Python (no LLM calls for scoring), logs everything to `logs/evaluations.jsonl`, and returns only `"Accuracy: X% (n/100 correct)"`.
+Called locally by the runner when Claude invokes the `evaluate_prompt` tool. Generates 100 freshly randomised training problems, formats each as `{problem_prefix}{question}{answer_prefix}` for raw text completion via mlx-lm (batch inference), scores purely in Python (no LLM calls for scoring), logs everything to `logs/evaluations.jsonl`, and returns only `"Accuracy: X% (n/100 correct)"`.
 
 ## Key design invariants
 
@@ -60,7 +60,7 @@ All tuneable values are in `config.py`: model names, problem counts, retry setti
 
 ## Log format
 
-`logs/evaluations.jsonl` — one JSON line per `evaluate_prompt` call, with full prompt, all 100 problems, model responses, extracted answers, and per-problem correctness.
+`logs/evaluations.jsonl` — one JSON line per `evaluate_prompt` call, with `problem_prefix`, `answer_prefix`, all 100 problems, model responses, extracted answers, and per-problem correctness.
 
 `logs/test_results.jsonl` — same schema, written by `test_eval.py` after each session.
 
