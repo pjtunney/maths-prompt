@@ -17,6 +17,7 @@ from maths_prompt.config import (
     MLX_MODEL_PATH,
     RETRY_DELAY_SECONDS,
     SESSION_LOG_PATH,
+    SUMMARY_PATH,
     TEST_LOG_PATH,
     TRAIN_PROBLEM_COUNT,
 )
@@ -92,6 +93,8 @@ def run():
 
     consecutive_failures = 0
     previous_summary: str | None = None
+    if SUMMARY_PATH.exists():
+        previous_summary = SUMMARY_PATH.read_text().strip() or None
 
     # Resume session numbering from where previous runs left off
     start_session = 1
@@ -151,6 +154,8 @@ def run():
                 if result.summary:
                     console.print(result.summary[:2000])
                 previous_summary = result.summary
+                if result.summary:
+                    SUMMARY_PATH.write_text(result.summary)
             else:
                 console.print("Session did not complete successfully")
                 consecutive_failures += 1
@@ -219,7 +224,7 @@ def reset(yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation
     if not yes:
         typer.confirm("Delete all log files and start fresh?", abort=True)
 
-    for path in (EVAL_LOG_PATH, SESSION_LOG_PATH, TEST_LOG_PATH):
+    for path in (EVAL_LOG_PATH, SESSION_LOG_PATH, TEST_LOG_PATH, SUMMARY_PATH):
         if path.exists():
             path.unlink()
 

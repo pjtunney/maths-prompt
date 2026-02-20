@@ -6,6 +6,7 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 EVAL_LOG_PATH = LOGS_DIR / "evaluations.jsonl"
 TEST_LOG_PATH = LOGS_DIR / "test_results.jsonl"
 SESSION_LOG_PATH = LOGS_DIR / "sessions.jsonl"
+SUMMARY_PATH = LOGS_DIR / "last_summary.txt"
 
 # MLX model (pre-quantized to 4-bit for speed)
 MLX_MODEL_PATH = PROJECT_ROOT / "models/Qwen2.5-0.5B-4bit"
@@ -23,7 +24,7 @@ SESSION_TIMEOUT_SECONDS = 7200
 
 # Anthropic API
 API_MODEL = "claude-sonnet-4-6"
-MAX_TOOL_CALLS = 20
+MAX_TOOL_CALLS = 40
 MAX_TOKENS_PER_TURN = 4096
 
 OPTIMIZER_SYSTEM_PROMPT = """\

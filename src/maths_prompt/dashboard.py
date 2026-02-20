@@ -1,7 +1,6 @@
 """Streamlit dashboard for monitoring prompt optimisation progress."""
 
 import json
-import time
 
 import pandas as pd
 import streamlit as st
@@ -133,10 +132,32 @@ if session_logs:
 
 # Full history table
 st.subheader("Evaluation history")
-display_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "prompt"]].copy()
-display_df["accuracy"] = display_df["accuracy"].map("{:.1%}".format)
-display_df["prompt"] = display_df["prompt"].str[:80] + "..."
-st.dataframe(display_df, use_container_width=True)
 
-time.sleep(5)
-st.rerun()
+
+@st.fragment
+def eval_history_table():
+    display_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "prompt"]].copy()
+    display_df["accuracy"] = display_df["accuracy"].map("{:.1%}".format)
+    display_df["prompt"] = display_df["prompt"].str[:80] + "..."
+    event = st.dataframe(
+        display_df,
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-row",
+    )
+    if event.selection and event.selection.rows:
+        selected_row = event.selection.rows[0]
+        full_prompt = train_df.iloc[selected_row]["prompt"]
+        iter_num = int(train_df.iloc[selected_row]["iteration"])
+        acc = train_df.iloc[selected_row]["accuracy"]
+        st.caption(f"Iteration {iter_num} | Accuracy {acc:.1%}")
+        st.code(full_prompt, language=None)
+
+
+eval_history_table()
+
+# CSV download with full prompts
+export_df = train_df[["iteration", "session", "accuracy", "num_correct", "num_problems", "prompt"]].copy()
+st.download_button("Download full CSV", export_df.to_csv(index=False), "evaluations.csv", "text/csv")
+
+st.button("Refresh", on_click=st.rerun)
